@@ -1,0 +1,72 @@
+# dsh-installer electron-builder config (M2).
+# See third-party/deepseek-harness-desktop/apps/dsh-desktop/electron-builder.yml.
+
+appId: com.example.dsh-installer
+productName: dsh-installer
+copyright: Copyright (c) 2026 dsh-installer contributors
+
+asar: true
+asarUnpack:
+  - node_modules/**
+  - bundled/**
+compression: normal
+afterPack: scripts/after-pack.cjs
+npmRebuild: false
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**
+  - bundled/**
+  - package.json
+  - '!**/*.map'
+  - '!**/*.test.mjs'
+  - '!src/smoke.mjs'
+  - '!src/launch-smoke.mjs'
+  - '!bundled/**/tests/**'
+  - '!bundled/**/src/**'
+  - '!bundled/**/tsconfig.json'
+  - '!bundled/**/tsdown.config.ts'
+
+# TODO(you): add build/icon.ico and set win.icon + nsis icon when available;
+# electron-builder falls back to the default Electron icon otherwise.
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  include: build/installer.nsh
+  artifactName: dsh-installer-Setup-${version}-${arch}.${ext}
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: dsh-installer
+
+# macOS: build on macOS only (electron-builder cannot produce .dmg elsewhere).
+# No icon set yet — electron-builder falls back to the default Electron icon.
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
+  artifactName: dsh-installer-${version}-${arch}.${ext}
+
+# TODO(you): set your GitHub owner/repo so electron-updater + release CI work.
+publish:
+  provider: github
+  owner: YOUR_GITHUB_OWNER
+  repo: dsh-installer

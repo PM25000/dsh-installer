@@ -1,0 +1,13 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.log
+runtime-prune-report.json
+.DS_Store
+
+# Local plugin sources and synced bundles (populate via scripts/sync-bundled.mjs)
+bundled/
+plugin-sources/
+
+# Personal scratch material (screenshots, videos, drafts)
+scratch/

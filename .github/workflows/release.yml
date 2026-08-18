@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Preserve repository line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --test scripts/*.test.mjs
+      - run: node src/smoke.mjs
+      - run: node src/launch-smoke.mjs
+      - run: pnpm pack:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: pnpm pack:verify
+      - name: Write checksums
+        shell: pwsh
+        run: |
+          $installer = Get-Item dist/dsh-installer-Setup-*.exe
+          $hash = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/dsh-installer-Setup-*.exe
+            dist/dsh-installer-Setup-*.exe.blockmap
+            dist/latest.yml
+            dist/SHA256SUMS.txt
+
+  # macOS build — must run on macOS. Bundled plugin sources are pulled in via
+  # env: the wallpaper ships in the public deepseek-harness repo (sparse
+  # checkout below); the course-selector plugin source is private, so point
+  # COURSE_SELECTOR_SOURCE at your own checkout (action secret or extra step).
+  build-mac:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Fetch wallpaper plugin source (public repo)
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/deepseek-ai/deepseek-harness.git .deps/dsh
+          git -C .deps/dsh sparse-checkout set packages/client/ui-wallpaper
+      - run: pnpm install --frozen-lockfile
+      - run: node --test scripts/*.test.mjs
+      - run: node src/smoke.mjs
+      - run: node src/launch-smoke.mjs
+      - name: Pack macOS
+        run: pnpm pack:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          WALLPAPER_SOURCE: ${{ github.workspace }}/.deps/dsh/packages/client/ui-wallpaper
+          COURSE_SELECTOR_SOURCE: ${{ vars.COURSE_SELECTOR_SOURCE }}
+      - run: pnpm pack:verify
+      - name: Rename macOS checksum
+        run: mv dist/SHA256SUMS.txt dist/SHA256SUMS-mac.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/dsh-installer-*.dmg
+            dist/dsh-installer-*.zip
+            dist/SHA256SUMS-mac.txt
