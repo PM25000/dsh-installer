@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -35,6 +36,15 @@ jobs:
           $installer = Get-Item dist/dsh-installer-Setup-*.exe
           $hash = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
           "$hash  $($installer.Name)" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-installer-windows
+          path: |
+            dist/dsh-installer-Setup-*.exe
+            dist/dsh-installer-Setup-*.exe.blockmap
+            dist/latest.yml
+            dist/SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -43,10 +53,9 @@ jobs:
             dist/latest.yml
             dist/SHA256SUMS.txt
 
-  # macOS build — must run on macOS. Bundled plugin sources are pulled in via
-  # env: the wallpaper ships in the public deepseek-harness repo (sparse
-  # checkout below); the course-selector plugin source is private, so point
-  # COURSE_SELECTOR_SOURCE at your own checkout (action secret or extra step).
+  # macOS build — must run on macOS (macos-latest). Both bundled plugin sources
+  # are fetched from their public repos (deepseek-harness wallpaper + the
+  # public dsh-course-selector), so no private env is required.
   build-mac:
     runs-on: macos-latest
     timeout-minutes: 60
@@ -57,23 +66,34 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Fetch wallpaper plugin source (public repo)
+      - name: Fetch wallpaper plugin source (deepseek-harness repo)
         run: |
           git clone --depth 1 --filter=blob:none --sparse https://github.com/deepseek-ai/deepseek-harness.git .deps/dsh
           git -C .deps/dsh sparse-checkout set packages/client/ui-wallpaper
+      - name: Fetch course-selector plugin source (public repo)
+        run: |
+          git clone --depth 1 https://github.com/PM25000/dsh-course-selector.git .deps/course-selector
       - run: pnpm install --frozen-lockfile
       - run: node --test scripts/*.test.mjs
       - run: node src/smoke.mjs
       - run: node src/launch-smoke.mjs
-      - name: Pack macOS
+      - name: Pack macOS (dmg + zip, arm64 + x64)
         run: pnpm pack:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           WALLPAPER_SOURCE: ${{ github.workspace }}/.deps/dsh/packages/client/ui-wallpaper
-          COURSE_SELECTOR_SOURCE: ${{ vars.COURSE_SELECTOR_SOURCE }}
+          COURSE_SELECTOR_SOURCE: ${{ github.workspace }}/.deps/course-selector
       - run: pnpm pack:verify
       - name: Rename macOS checksum
         run: mv dist/SHA256SUMS.txt dist/SHA256SUMS-mac.txt
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-installer-macos
+          path: |
+            dist/dsh-installer-*.dmg
+            dist/dsh-installer-*.zip
+            dist/SHA256SUMS-mac.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: |
