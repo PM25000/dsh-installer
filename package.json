@@ -6,6 +6,14 @@
   "type": "module",
   "main": "src/electron-main.mjs",
   "author": "dsh-installer contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PM25000/dsh-installer.git"
+  },
+  "homepage": "https://github.com/PM25000/dsh-installer",
+  "bugs": {
+    "url": "https://github.com/PM25000/dsh-installer/issues"
+  },
   "license": "BSD-3-Clause",
   "engines": {
     "node": ">=22.19"
