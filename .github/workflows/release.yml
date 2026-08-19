@@ -24,6 +24,9 @@ jobs:
           cache: pnpm
       - name: Fetch course-selector plugin source (public repo)
         run: git clone --depth 1 https://github.com/PM25000/dsh-course-selector.git .deps/course-selector
+      - name: Build course-selector plugin (its lib/ is gitignored)
+        working-directory: .deps/course-selector
+        run: npm install --legacy-peer-deps && npm run build
       - run: pnpm install --frozen-lockfile
       - run: node --test scripts/*.test.mjs
       - run: node src/smoke.mjs
@@ -72,6 +75,9 @@ jobs:
       - name: Fetch course-selector plugin source (public repo)
         run: |
           git clone --depth 1 https://github.com/PM25000/dsh-course-selector.git .deps/course-selector
+      - name: Build course-selector plugin (its lib/ is gitignored)
+        working-directory: .deps/course-selector
+        run: npm install --legacy-peer-deps && npm run build
       - run: pnpm install --frozen-lockfile
       - run: node --test scripts/*.test.mjs
       - run: node src/smoke.mjs
