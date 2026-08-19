@@ -15,6 +15,7 @@
     "url": "https://github.com/PM25000/dsh-installer/issues"
   },
   "license": "BSD-3-Clause",
+  "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": ">=22.19"
   },

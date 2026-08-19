@@ -28,6 +28,10 @@ const SOURCES = [
     env: 'WALLPAPER_SOURCE',
     relative: 'deepseek-harness/packages/client/ui-wallpaper',
     copy: ['lib', 'cordis.patch.yml', 'package.json'],
+    // Private source: not available on the public CI runners. When the source
+    // is missing this plugin is skipped, and config.mjs drops it from the
+    // profile (only plugins that shipped in bundled/ are assembled).
+    optional: true,
   },
 ]
 
@@ -40,22 +44,27 @@ function resolveSource(entry) {
 async function syncEntry(entry) {
   const source = resolveSource(entry)
   const target = join(projectRoot, 'bundled', ...entry.package.split('/'))
+  // Optional plugins are skipped (with a warning) when their source is missing,
+  // so a public CI build that cannot fetch a private plugin still succeeds.
+  const firstFrom = join(source, entry.copy[0])
+  try {
+    await stat(firstFrom)
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+    if (entry.optional) {
+      console.log(`[sync-bundled] SKIP ${entry.package}: optional source missing (${source})`)
+      return null
+    }
+    throw new Error(
+      `sync-bundled: source missing ${firstFrom}\n`
+      + `Point ${entry.env ?? entry.relative} at the plugin's built checkout, or place it under `
+      + `plugin-sources/${entry.relative}`,
+    )
+  }
   const stats = []
   for (const item of entry.copy) {
     const from = join(source, item)
     const to = join(target, item)
-    try {
-      await stat(from)
-    } catch (error) {
-      if (error?.code === 'ENOENT') {
-        throw new Error(
-          `sync-bundled: source missing ${from}\n`
-          + `Point ${entry.env ?? entry.relative} at the plugin's built checkout, or place it under `
-          + `plugin-sources/${entry.relative}`,
-        )
-      }
-      throw error
-    }
     await rm(to, { recursive: true, force: true })
     await mkdir(join(target, ...item.split('/').slice(0, -1)), { recursive: true })
     await cp(from, to, { recursive: true, force: true })
@@ -69,6 +78,7 @@ async function main() {
   const targets = []
   for (const entry of SOURCES) {
     const report = await syncEntry(entry)
+    if (report === null) continue
     console.log(`[sync-bundled] ${report}`)
     targets.push(join(projectRoot, 'bundled', ...entry.package.split('/')))
   }

@@ -11,6 +11,7 @@
 // managedBundles is the ordered `dsh.profile.bundles` layer list — base first,
 // then the web-app bundle (serves the GUI), then your selected plugins.
 
+import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -29,7 +30,10 @@ export const dshHome = process.env.DSH_HOME || defaultHome
 export const workspace = process.cwd()
 
 // Ordered bundle layer list — base first, then web app, then your plugins.
-export const managedBundles = [
+// Managed bundles that were not actually packed into bundled/ (e.g. a plugin
+// whose private source was unavailable at build time) are dropped below, so the
+// assembled profile only references what ships in the app.
+const ALL_BUNDLES = [
   '@deepseek-ai/dsh-base',
   '@deepseek-ai/dsh-web-app',
   '@deepseek-ai/dsh-client-ui-wallpaper',
@@ -44,10 +48,10 @@ const projectRoot = process.resourcesPath
   ? join(process.resourcesPath, 'app.asar.unpacked')
   : join(import.meta.dirname, '..')
 
-// Bundled package roots: runtime base bundles resolve from node_modules, the
-// wallpaper plugin ships from bundled/. The runtime assembly junction-links
-// each into the profile's node_modules so the dsh CLI boots them offline.
-export const packageRoots = new Map([
+// Candidate package roots: runtime base bundles resolve from node_modules, the
+// wallpaper/course-selector plugins ship from bundled/. Only entries whose
+// package.json is actually present are linked into the profile.
+const candidateRoots = new Map([
   ['@deepseek-ai/dsh-base', join(projectRoot, 'node_modules', '@deepseek-ai', 'dsh-base')],
   ['@deepseek-ai/dsh-web-app', join(projectRoot, 'node_modules', '@deepseek-ai', 'dsh-web-app')],
   ['@deepseek-ai/dsh-host-directory-picker-browse', join(projectRoot, 'node_modules', '@deepseek-ai', 'dsh-host-directory-picker-browse')],
@@ -55,6 +59,13 @@ export const packageRoots = new Map([
   ['@deepseek-ai/dsh-client-ui-wallpaper', join(projectRoot, 'bundled', '@deepseek-ai', 'dsh-client-ui-wallpaper')],
   ['dsh-course-selector', join(projectRoot, 'bundled', 'dsh-course-selector')],
 ])
+
+export const packageRoots = new Map(
+  [...candidateRoots].filter(([, dir]) => existsSync(join(dir, 'package.json'))),
+)
+
+// Profile bundle layers, filtered to what actually ships in the app.
+export const managedBundles = ALL_BUNDLES.filter((name) => packageRoots.has(name))
 
 // dsh runtime CLI entry — the compiled binary, not source.
 export const cliPath = join(projectRoot, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
